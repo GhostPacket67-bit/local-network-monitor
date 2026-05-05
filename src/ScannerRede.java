@@ -1,4 +1,6 @@
 import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.util.Enumeration;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -7,34 +9,74 @@ public class ScannerRede {
 
     public static void escanear() {
 
-        String ipBase = "192.168.0.";
-        AtomicInteger ativos = new AtomicInteger(0);
+        try {
+            String ipBase = obterBaseIP();
 
-        ExecutorService pool = Executors.newFixedThreadPool(50);
+            if (ipBase == null) {
+                System.out.println("[ERRO] Não foi possível detectar a rede.");
+                return;
+            }
 
-        System.out.println("[INFO] Escaneando rede (modo rápido)...\n");
+            AtomicInteger ativos = new AtomicInteger(0);
+            ExecutorService pool = Executors.newFixedThreadPool(50);
 
-        for (int i = 1; i <= 254; i++) {
-            final int hostFinal = i;
+            System.out.println("[INFO] Escaneando rede: " + ipBase + "0/24\n");
 
-            pool.execute(() -> {
-                try {
-                    String host = ipBase + hostFinal;
-                    InetAddress inet = InetAddress.getByName(host);
+            for (int i = 1; i <= 254; i++) {
+                final int hostFinal = i;
 
-                    if (inet.isReachable(200)) {
-                        System.out.println(Cores.VERDE + "[ATIVO] " + host + Cores.RESET);
-                        ativos.incrementAndGet();
-                    }
+                pool.execute(() -> {
+                    try {
+                        String host = ipBase + hostFinal;
+                        InetAddress inet = InetAddress.getByName(host);
 
-                } catch (Exception ignored) {}
-            });
+                        if (inet.isReachable(200)) {
+                            System.out.println("[ATIVO] " + host);
+                            ativos.incrementAndGet();
+
+                            Logger.salvar("Ativo: " + host);
+                        }
+
+                    } catch (Exception ignored) {}
+                });
+            }
+
+            pool.shutdown();
+            while (!pool.isTerminated()) {}
+
+            System.out.println("\n[RESULTADO] Dispositivos ativos: " + ativos.get());
+
+        } catch (Exception e) {
+            System.out.println("[ERRO] " + e.getMessage());
         }
+    }
 
-        pool.shutdown();
+    private static String obterBaseIP() {
+        try {
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
 
-        while (!pool.isTerminated()) {}
+            while (interfaces.hasMoreElements()) {
+                NetworkInterface ni = interfaces.nextElement();
 
-        System.out.println("\n[RESULTADO] Dispositivos ativos: " + ativos.get());
+                if (!ni.isUp() || ni.isLoopback()) continue;
+
+                Enumeration<InetAddress> enderecos = ni.getInetAddresses();
+
+                while (enderecos.hasMoreElements()) {
+                    InetAddress addr = enderecos.nextElement();
+
+                    if (!addr.isLoopbackAddress() && addr.getHostAddress().contains(".")) {
+
+                        String ip = addr.getHostAddress();
+
+                        // Ex: 192.168.0.15 → 192.168.0.
+                        return ip.substring(0, ip.lastIndexOf(".") + 1);
+                    }
+                }
+            }
+
+        } catch (Exception ignored) {}
+
+        return null;
     }
 }
