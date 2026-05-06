@@ -3,52 +3,59 @@ import java.net.NetworkInterface;
 import java.util.Enumeration;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class ScannerRede {
 
+    private static final int TIMEOUT = 150;
+    private static final int THREADS = 50;
+
     public static void escanear() {
 
         try {
-            String ipBase = obterBaseIP();
+            String baseIP = obterBaseIP();
 
-            if (ipBase == null) {
-                System.out.println("[ERRO] Não foi possível detectar a rede.");
+            if (baseIP == null) {
+                System.out.println("[ERRO] Rede não detectada.");
                 return;
             }
 
-            AtomicInteger ativos = new AtomicInteger(0);
-            ExecutorService pool = Executors.newFixedThreadPool(50);
+            System.out.println("[INFO] Iniciando varredura: " + baseIP + "0/24\n");
 
-            System.out.println("[INFO] Escaneando rede: " + ipBase + "0/24\n");
+            AtomicInteger ativos = new AtomicInteger(0);
+            ExecutorService pool = Executors.newFixedThreadPool(THREADS);
 
             for (int i = 1; i <= 254; i++) {
-                final int hostFinal = i;
+                final int host = i;
 
-                pool.execute(() -> {
-                    try {
-                        String host = ipBase + hostFinal;
-                        InetAddress inet = InetAddress.getByName(host);
-
-                        if (inet.isReachable(200)) {
-                            System.out.println("[ATIVO] " + host);
-                            ativos.incrementAndGet();
-
-                            Logger.salvar("Ativo: " + host);
-                        }
-
-                    } catch (Exception ignored) {}
-                });
+                pool.execute(() -> scanHost(baseIP + host, ativos));
             }
 
             pool.shutdown();
-            while (!pool.isTerminated()) {}
+            pool.awaitTermination(2, TimeUnit.MINUTES);
 
             System.out.println("\n[RESULTADO] Dispositivos ativos: " + ativos.get());
 
         } catch (Exception e) {
             System.out.println("[ERRO] " + e.getMessage());
         }
+    }
+
+    private static void scanHost(String ip, AtomicInteger ativos) {
+        try {
+            InetAddress inet = InetAddress.getByName(ip);
+
+            if (inet.isReachable(TIMEOUT)) {
+                ativos.incrementAndGet();
+
+                String msg = "[ATIVO] " + ip;
+                System.out.println(msg);
+
+                Logger.log(Logger.Level.INFO, "Host ativo detectado: " + ip);
+            }
+
+        } catch (Exception ignored) {}
     }
 
     private static String obterBaseIP() {
@@ -60,16 +67,13 @@ public class ScannerRede {
 
                 if (!ni.isUp() || ni.isLoopback()) continue;
 
-                Enumeration<InetAddress> enderecos = ni.getInetAddresses();
+                Enumeration<InetAddress> addrs = ni.getInetAddresses();
 
-                while (enderecos.hasMoreElements()) {
-                    InetAddress addr = enderecos.nextElement();
+                while (addrs.hasMoreElements()) {
+                    InetAddress addr = addrs.nextElement();
 
                     if (!addr.isLoopbackAddress() && addr.getHostAddress().contains(".")) {
-
                         String ip = addr.getHostAddress();
-
-                        // Ex: 192.168.0.15 → 192.168.0.
                         return ip.substring(0, ip.lastIndexOf(".") + 1);
                     }
                 }

@@ -1,28 +1,20 @@
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-
 public class WifiScanner {
 
-    public static void escanearWifi() {
+    public static void scan() {
         try {
-            System.out.println("[INFO] Procurando redes Wi-Fi...\n");
+            System.out.println("[INFO] Escaneando Wi-Fi...\n");
 
-            ProcessBuilder pb = new ProcessBuilder("sh", "-c", "termux-wifi-scaninfo");
-            Process process = pb.start();
+            String result = CommandRunner.run("termux-wifi-scaninfo");
 
-            BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream())
-            );
-
-            String linha;
-
-            while ((linha = reader.readLine()) != null) {
-                System.out.println(linha);
+            if (result.isEmpty()) {
+                System.out.println("[AVISO] Nenhuma rede encontrada ou permissão negada.");
+                return;
             }
 
+            System.out.println("[RESULTADO]\n" + result);
+
         } catch (Exception e) {
-            System.out.println("[ERRO] " + e.getMessage());
-            System.out.println("[DICA] Instale: pkg install termux-api");
+            System.out.println("[ERRO] Falha ao escanear Wi-Fi: " + e.getMessage());
         }
     }
 }

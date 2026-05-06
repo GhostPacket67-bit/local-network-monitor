@@ -1,16 +1,26 @@
 public class Carregando {
 
-    public static void animar() throws InterruptedException {
+    private static final String[] FRAMES = {"|", "/", "-", "\\"};
 
-        String[] animacao = {"|", "/", "-", "\\"};
+    public static void animar(String mensagem, int duracaoMs) {
 
-        System.out.print("[LOADING] ");
+        System.out.print("[LOADING] " + mensagem + " ");
 
-        for (int i = 0; i < 20; i++) {
-            System.out.print("\r[LOADING] " + animacao[i % animacao.length]);
-            Thread.sleep(120);
+        long inicio = System.currentTimeMillis();
+        int i = 0;
+
+        try {
+            while (System.currentTimeMillis() - inicio < duracaoMs) {
+                System.out.print("\r[LOADING] " + mensagem + " " + FRAMES[i % FRAMES.length]);
+                Thread.sleep(120);
+                i++;
+            }
+
+            System.out.print("\r[LOADING] " + mensagem + " Concluído!\n");
+
+        } catch (InterruptedException e) {
+            System.out.print("\r[LOADING] " + mensagem + " Interrompido!\n");
+            Thread.currentThread().interrupt();
         }
-
-        System.out.print("\r[LOADING] Concluído!\n");
     }
 }
